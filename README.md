@@ -14,8 +14,11 @@ whose agent quit back to a shell, are dropped automatically.
 
 ## Keys
 
-- `prefix a`  fzf popup of every agent in every session (waiting first, live pane preview), enter jumps.
-- `prefix A`  jump straight to the oldest agent that needs you (waiting, else done).
+- `prefix a` / `prefix A`  searchable fzf popup of every agent in every session: reported
+  state first (`⚠` waiting, `✓` done, `●` working), then agents found only by process
+  name (`○`, from `@agent-status-agents`, default `pi claude codex opencode`). Type to
+  filter, live pane preview, enter jumps.
+- Optional `@agent-status-key-next`: jump straight to the oldest agent that needs you.
 
 ## Install
 
@@ -41,7 +44,8 @@ It also links `agent-status` into `~/.local/bin`.
 
 | option | default | |
 |---|---|---|
-| `key-pick` / `key-next` | `a` / `A` | `""` disables a binding |
+| `key-pick` / `key-next` | `a A` / none | keys for the popup / one-key jump-to-waiting |
+| `agents` | `pi claude codex opencode` | process names listed even before they report |
 | `notify` | `on` | master switch for desktop notifications |
 | `notify-done` | `off` | also notify when an agent finishes |
 | `notify-done-min-secs` | `0` | only if the run took at least this long |
@@ -51,9 +55,12 @@ It also links `agent-status` into `~/.local/bin`.
 | `color-waiting` / `color-done` | `yellow` / `green` | |
 | `modify-status` / `modify-window-format` | `on` | set `off` to place `#{@agent_summary}` / `#{@agent_mark}` yourself |
 
-Notifications use `notify-send` (needs a running notification daemon; without one
-they silently do nothing and the bar/list still work). Override the command with
-`AGENT_STATUS_NOTIFY_CMD` (called as `cmd TITLE BODY`).
+Notifications prefer `omarchy-notification-send` (toast with glyph; **click jumps to
+the pane and raises the terminal**), fall back to `notify-send`, and do nothing if
+neither exists. Extra options: `urgency-waiting` (`critical`), `urgency-done`
+(`normal`), `glyph-waiting`, `glyph-done`. `tmux-message on` also shows a banner on
+every client's status line. Override everything with `AGENT_STATUS_NOTIFY_CMD`
+(called as `cmd TITLE BODY`).
 
 ## How it works
 

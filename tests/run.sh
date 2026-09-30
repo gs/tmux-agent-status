@@ -54,7 +54,10 @@ s=$(summary); case "$s" in *"⚠1"*"✓1"*) ok "waiting then done ordering";; *)
 
 echo "list ordering"
 first=$(as "$P1" list | head -1 | cut -f1); eq "waiting listed first" "$first" "$P1"
-eq "three... two records listed" "$(as "$P1" list | wc -l)" "2"
+eq "two reported agents listed" "$(as "$P1" list | grep -vc '○')" "2"
+eq "unreported agent pane discovered by name" "$(as "$P1" list | grep -c '○')" "1"
+eq "discovered pane is the third one" "$(as "$P1" list | grep '○' | cut -f1)" "$P3"
+eq "discovered agents never hit the bar" "$(summary | grep -c '○')" "0"
 
 echo "transition back to working clears"
 as "$P1" set working
@@ -70,7 +73,7 @@ eq "focused seen clears ✓" "$(summary)" ""
 echo "done while watching leaves no record"
 FOC=1 as "$P3" set working --agent codex
 FOC=1 as "$P3" set done
-eq "no record for focused done" "$(as "$P3" list | wc -l)" "1"   # P1 still working
+eq "no record for focused done" "$(as "$P3" list | grep -vc '○')" "1"   # P1 still working
 
 echo "gc: pane closed / agent back at shell"
 as "$P3" set waiting --agent codex
@@ -115,6 +118,13 @@ eq "jumps to oldest waiting" "$(tm display-message -p '#{pane_id}')" "$P1"
 as "$P1" clear
 "$BIN" jump next "$CLIENT" ""
 eq "falls back to done" "$(tm display-message -p '#{pane_id}')" "$P2"
+
+tm select-window -t "$(win "$P2")"
+"$BIN" jump pane "$P1" '#{client_name}'
+eq "unexpanded client format falls back to active client" "$(tm display-message -p -c "$CLIENT" '#{pane_id}')" "$P1"
+tm select-window -t "$(win "$P2")"
+"$BIN" jump pane "$P1" ""
+eq "empty client falls back too" "$(tm display-message -p -c "$CLIENT" '#{pane_id}')" "$P1"
 
 echo "plugin entry is idempotent"
 tm set -g status-right "RIGHT"; tm set -gw window-status-format " #I:#W "

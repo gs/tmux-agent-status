@@ -9,11 +9,14 @@ BIN="$CURRENT_DIR/bin/agent-status"
 get() { local v; v=$(tmux show-option -gqv "$1"); printf '%s' "${v:-$2}"; }
 off() { case "$(get "$1" on)" in off|0|no|false) return 0 ;; esac; return 1; }
 
-# Keys (set the option to "" to skip a binding).
-key_pick=$(get @agent-status-key-pick a)
-key_next=$(get @agent-status-key-next A)
-[ -n "$key_pick" ] && tmux bind-key -N "Agent list (jump)" "$key_pick" \
-  display-popup -E -w 80% -h 60% -T " agents " "'$BIN' pick '#{client_name}'"
+# Keys. key-pick may hold several keys (default "a A"); "" skips a binding.
+# key-next (default none) is a one-key "jump to oldest agent that needs me".
+key_pick=$(get @agent-status-key-pick "a A")
+key_next=$(get @agent-status-key-next "")
+for k in $key_pick; do
+  tmux bind-key -N "Agent list (search + jump)" "$k" \
+    run-shell "tmux display-popup -c '#{client_name}' -E -w 80% -h 60% -T ' agents ' \"'$BIN' pick '#{client_name}'\""
+done
 [ -n "$key_next" ] && tmux bind-key -N "Jump to next agent that needs you" "$key_next" \
   run-shell "'$BIN' jump next '#{client_name}' '#{pane_id}'"
 
