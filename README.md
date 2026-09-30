@@ -70,7 +70,7 @@ for you.
 
 ## Install
 
-**TPM:** `set -g @plugin '<owner>/tmux-agent-status'` (replace `<owner>` with the GitHub account hosting this repo). **Without TPM**, add to `tmux.conf`, *after* your
+**TPM:** `set -g @plugin 'gs/tmux-agent-status'`. **Without TPM**, add to `tmux.conf`, *after* your
 status-bar options:
 
 ```tmux
