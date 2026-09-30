@@ -5,24 +5,25 @@
 [![tmux >= 3.2](https://img.shields.io/badge/tmux-%E2%89%A5%203.2-1bb91f.svg)](#requirements)
 
 **Quiet status for the coding agents running in your tmux panes**: Claude Code, Codex, opencode and pi.
-Nothing is shown while agents work. When one needs you, you get a small marker, an optional
-desktop toast, and a searchable list to jump straight to it.
+Nothing is shown while agents work. When one needs you, you get a small marker in the bar (and,
+if you like, a short banner), plus a searchable list to jump straight to it. **It lives entirely
+inside tmux**: no desktop notifications, no daemons.
 
 <p align="center">
-  <img src="docs/img/waiting.png" alt="Five agents work silently; claude blocks on a permission prompt: a warning in the tmux bar and a desktop toast at the top of the screen" width="900">
+  <img src="docs/img/picker.png" alt="prefix+a lists every agent across all tmux sessions: claude is blocked on a permission prompt (warning), codex finished, two pi agents are working; the preview shows the exact command claude is asking about" width="900">
 </p>
 
-<sub>Real terminal, real tmux, real desktop toast; only the agents are stand-ins. The yellow line is a caption added for the demo.</sub>
+<sub>Real terminal and real tmux; only the agents are stand-ins. The yellow line is a caption added for the demo.</sub>
 
 ## What you see
 
 Three states, and only two of them ever show up. Working is deliberately invisible.
 
-| state | meaning | bar / window marker | desktop toast |
+| state | meaning | bar / window marker | banner (optional) |
 |---|---|---|---|
 | working | agent busy | nothing | never |
 | waiting | blocked on a permission or a question | `⚠N` / `⚠` | yes, unless you're already looking at it |
-| done | finished, you haven't looked yet | `✓N` / `✓` | off by default |
+| done | finished, you haven't looked yet | `✓N` / `✓` | never |
 
 ### 1. Silent until something needs you
 
@@ -34,11 +35,12 @@ focus that pane, with nothing to dismiss.
 
 ### 2. When an agent needs you
 
-The warning appears in the bar (top right of the screenshot above) and, unless you're already looking at that pane, a desktop toast
-(Omarchy's notification server, or plain `notify-send`) lands at the top of the screen. Clicking it
-jumps to the pane and raises the terminal window.
+The `⚠` stays in the bar until you deal with it. If you want a nudge as well, turn on the banner
+(`set -g @agent-status-banner on`): for a few seconds the status line of every attached client shows
+which agent is blocked and where. It never shows if you're already looking at that pane, and never
+twice within 10 seconds for the same one.
 
-![Desktop toast](docs/img/toast.png)
+![The banner on the status line](docs/img/banner.png)
 
 ### 3. `prefix a` (or `prefix A`): search and jump
 
@@ -54,12 +56,11 @@ Type to filter by agent, session or window. Enter jumps.
 
 ### 4. Land right on the prompt
 
-Enter switches session, window and pane and, on Hyprland, raises the terminal.
+Enter switches session, window and pane.
 
 ![After the jump: the permission prompt](docs/img/jumped.png)
 
-Answer it and the warning clears itself (and its toast is dismissed). The finished agent's `✓` waits
-for you.
+Answer it and the warning clears itself. The finished agent's `✓` waits for you.
 
 ![Resolved: only the finished check mark is left](docs/img/resolved.png)
 
@@ -71,17 +72,15 @@ for you.
 | **bash ≥ 4.2** | associative arrays | required. macOS ships 3.2: `brew install bash` |
 | **git** | clone / TPM | to install |
 | **procps** (`ps`) | knows when an agent has really exited | required in practice; without it the plugin falls back to the foreground command name, which is less reliable for wrapper scripts |
-| **coreutils, sed, awk, util-linux** (`readlink -f`, `sort`, `timeout`, `flock`) | ordinary plumbing | present on any normal Linux; `flock` is optional |
+| **coreutils, sed, awk, util-linux** (`readlink -f`, `sort`, `flock`) | ordinary plumbing | present on any normal Linux; `flock` is optional |
 | **fzf** | the searchable popup | optional. Without it `prefix a` opens a plain numbered tmux menu |
 | **jq** | `install.sh` editing your agents' JSON configs | needed to run `install.sh`; the hooks themselves work without it |
-| **notify-send** (`libnotify`) or **Omarchy** | desktop toasts | optional. Without either there are simply no toasts |
-| **Hyprland** (`hyprctl`) | raise the terminal window after a toast click | optional |
 
-Debian/Ubuntu: `sudo apt install tmux git jq fzf libnotify-bin` (the rest is normally preinstalled).
-Arch: `sudo pacman -S tmux git jq fzf libnotify`.
+Debian/Ubuntu: `sudo apt install tmux git jq fzf` (the rest is normally preinstalled).
+Arch: `sudo pacman -S tmux git jq fzf`.
 
-Linux is what it's developed and tested on. macOS should work for the bar, markers and list with a newer
-bash, but it is untested and has no toasts. The pi and opencode adapters run inside those agents' own
+Linux is what it's developed and tested on. Nothing here is desktop-specific, so macOS should work with a
+newer bash, but it is untested. The pi and opencode adapters run inside those agents' own
 runtimes (Node), so they need nothing extra.
 
 ## Install
@@ -125,16 +124,14 @@ Agents that were already running when you installed keep running without reporti
 | `prefix a` / `prefix A` | searchable agent list, enter jumps (`Esc` closes); a plain menu if fzf isn't installed |
 | `@agent-status-key-next` (unbound by default) | one key: jump to the oldest agent that needs you |
 
-## Notifications
+## Banner (optional, off by default)
 
-- One toast when an agent starts **waiting**; none if you're looking at that pane; repeats within
-  10 s are dropped. `done` toasts are off unless you enable them.
-- Uses `omarchy-notification-send` if present (glyph, click-to-jump), else `notify-send`, else nothing.
-- `waiting` toasts are **critical**, so they stay until dismissed. They are dismissed automatically
-  when the agent resumes or exits. Set `urgency-waiting` to `normal` if you want them to expire.
-- **Do Not Disturb wins.** With DND on (Omarchy: the muted bell in the bar), toasts are silenced by
-  the notification server. The bar, markers and list still work. For a banner that DND doesn't touch,
-  use `set -g @agent-status-tmux-message on`: a message on the status line of every client.
+A short message on the status line when an agent starts **waiting** (not when it finishes). It is the
+only "notification" the plugin has, and it stays inside tmux: nothing is sent to your desktop, so it
+also works over SSH and on machines with no notification daemon.
+
+- Skipped when you're looking at that pane; repeats for the same pane within `debounce` seconds are dropped.
+- Enable: `set -g @agent-status-banner on`. Length: `@agent-status-banner-ms` (default 5000).
 
 ## Options
 
@@ -145,18 +142,12 @@ Agents that were already running when you installed keep running without reporti
 | `key-pick` | `a A` | keys for the popup; `""` to skip |
 | `key-next` | none | key for jump-to-oldest-waiting |
 | `agents` | `pi claude codex opencode` | process names listed before they report |
-| `notify` | `on` | master switch for toasts |
-| `notify-done` | `off` | also toast when an agent finishes |
-| `notify-done-min-secs` | `0` | only if the run took at least this long |
-| `debounce` | `10` | min seconds between toasts per pane |
-| `tmux-message` | `off` | also show a banner on the tmux status line |
-| `urgency-waiting` / `urgency-done` | `critical` / `normal` | Omarchy toast urgency |
-| `glyph-waiting` / `glyph-done` | `󰀪` / `󰄬` | Omarchy toast glyphs |
+| `banner` | `off` | status-line banner when an agent starts waiting |
+| `banner-ms` | `5000` | how long the banner stays |
+| `debounce` | `10` | min seconds between banners per pane |
 | `icon-waiting` / `icon-done` | `⚠` / `✓` | bar and window markers |
 | `color-waiting` / `color-done` | `yellow` / `green` | |
 | `modify-status` / `modify-window-format` | `on` | let the plugin edit `status-right` / window formats |
-
-`AGENT_STATUS_NOTIFY_CMD=/path/to/cmd` replaces the notifier entirely (called as `cmd TITLE BODY`).
 
 ## How it works
 
@@ -174,7 +165,8 @@ agent-status set <working|waiting|done> [--agent NAME] [--msg TEXT]
 agent-status clear | seen [PANE] | refresh | list
 agent-status pick [CLIENT]                 # the fzf popup
 agent-status jump next [CLIENT] [PANE]     # oldest agent that needs you
-agent-status jump pane PANE [CLIENT]       # what a toast click runs
+agent-status jump pane PANE [CLIENT]       # used by the fzf-less menu
+agent-status open | menu [CLIENT]          # what the key runs / the plain tmux menu
 ```
 
 ## Privacy and safety
@@ -188,7 +180,7 @@ text (messages, names) is stripped of control characters and `#` is escaped befo
 ## Development
 
 ```sh
-tests/run.sh          # runs against a private tmux server with the notifier stubbed
+tests/run.sh          # runs against a private tmux server
 shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh
 ```
 
