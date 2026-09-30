@@ -193,4 +193,4 @@ It never touches your real tmux sessions or agents. It needs `foot`, `grim`, `wf
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+Public domain ([Unlicense](LICENSE)). Copy it, change it, sell it, no attribution needed.
