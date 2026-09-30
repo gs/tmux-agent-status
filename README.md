@@ -5,10 +5,10 @@ Nothing is shown while agents work. When one needs you, you get a small marker, 
 desktop toast, and a searchable list to jump straight to it.
 
 <p align="center">
-  <img src="docs/img/demo.gif" alt="Screen recording: five agents work silently, one finishes, another blocks on a permission prompt and a toast appears, prefix+a opens a searchable list, enter jumps to the prompt" width="900">
+  <img src="docs/img/waiting.png" alt="Five agents work silently; claude blocks on a permission prompt: a warning in the tmux bar and a desktop toast at the top of the screen" width="900">
 </p>
 
-<sub>Real recording: a real terminal, real tmux and the real desktop toast; only the agents are stand-ins. The yellow line is a caption added for the demo. Full quality: [docs/img/demo.mp4](docs/img/demo.mp4).</sub>
+<sub>Real terminal, real tmux, real desktop toast; only the agents are stand-ins. The yellow line is a caption added for the demo.</sub>
 
 ## What you see
 
@@ -30,11 +30,9 @@ focus that pane, with nothing to dismiss.
 
 ### 2. When an agent needs you
 
-The warning appears in the bar and, unless you're already looking at that pane, a desktop toast
+The warning appears in the bar (top right of the screenshot above) and, unless you're already looking at that pane, a desktop toast
 (Omarchy's notification server, or plain `notify-send`) lands at the top of the screen. Clicking it
 jumps to the pane and raises the terminal window.
-
-![Blocked agent: warning in the bar and a toast at the top of the screen](docs/img/waiting.png)
 
 ![Desktop toast](docs/img/toast.png)
 
@@ -185,7 +183,7 @@ agents, grabs stills with `grim`, records with `wf-recorder`, and builds the GIF
 
 ```sh
 docs/demo/record.sh        # uses workspace 15; restores your workspace, pointer and DND afterwards
-docs/demo/postprocess.sh   # crops stills, builds docs/img/demo.gif and demo.mp4
+docs/demo/postprocess.sh   # crops the stills; also builds a gif/mp4 in docs/img/raw (git-ignored)
 ```
 
 It never touches your real tmux sessions or agents. It needs `foot`, `grim`, `wf-recorder`, `ffmpeg`,
