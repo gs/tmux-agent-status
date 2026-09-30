@@ -1,5 +1,9 @@
 # tmux-agent-status
 
+[![ci](https://github.com/gs/tmux-agent-status/actions/workflows/ci.yml/badge.svg)](https://github.com/gs/tmux-agent-status/actions/workflows/ci.yml)
+[![license: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
+[![tmux >= 3.2](https://img.shields.io/badge/tmux-%E2%89%A5%203.2-1bb91f.svg)](#requirements)
+
 **Quiet status for the coding agents running in your tmux panes**: Claude Code, Codex, opencode and pi.
 Nothing is shown while agents work. When one needs you, you get a small marker, an optional
 desktop toast, and a searchable list to jump straight to it.
@@ -188,7 +192,7 @@ tests/run.sh          # runs against a private tmux server with the notifier stu
 shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh
 ```
 
-CI (`.github/workflows/ci.yml`) runs both on every push.
+CI ([status](https://github.com/gs/tmux-agent-status/actions)) runs both on every push.
 
 ## License
 
