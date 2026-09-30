@@ -328,8 +328,8 @@ cmd_pick() {
   fi
   pane=$(printf '%s\n' "$out" | fzf --ansi --delimiter=$'\t' --with-nth=2.. \
       --no-sort --reverse --prompt='agent> ' --header='enter: jump  esc: close' \
-      --preview="tmux capture-pane -ep -t {1} | tail -n 40" \
-      --preview-window=down:50%:wrap | cut -f1) || exit 0
+      --preview="tmux capture-pane -ep -t {1} | awk 'NF{n=NR} {l[NR]=\$0} END{for(i=1;i<=n;i++)print l[i]}' | tail -n 40" \
+      --preview-window=down:40%:wrap:follow | cut -f1) || exit 0
   [ -n "$pane" ] || exit 0
   jump_to "$pane" "$client" || tmux display-message "agent-status: could not jump to $pane"
   focus_terminal "$(resolve_client "$client")"

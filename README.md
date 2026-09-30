@@ -5,10 +5,10 @@ Nothing is shown while agents work. When one needs you, you get a small marker, 
 desktop toast, and a searchable list to jump straight to it.
 
 <p align="center">
-  <img src="docs/img/demo.gif" alt="Screen recording: an agent blocks on a permission prompt, the bar shows a warning, prefix+a opens a searchable list, enter jumps to it" width="900">
+  <img src="docs/img/demo.gif" alt="Screen recording: five agents work silently, one finishes, another blocks on a permission prompt and a toast appears, prefix+a opens a searchable list, enter jumps to the prompt" width="900">
 </p>
 
-<sub>Real recording of the plugin (fake agents, isolated tmux). Full-quality video: [docs/img/demo.mp4](docs/img/demo.mp4).</sub>
+<sub>Real recording: a real terminal, real tmux and the real desktop toast; only the agents are stand-ins. The yellow line is a caption added for the demo. Full quality: [docs/img/demo.mp4](docs/img/demo.mp4).</sub>
 
 ## What you see
 
@@ -20,52 +20,46 @@ Three states, and only two of them ever show up. Working is deliberately invisib
 | waiting | blocked on a permission or a question | `⚠N` / `⚠` | yes, unless you're already looking at it |
 | done | finished, you haven't looked yet | `✓N` / `✓` | off by default |
 
-### 1. Quiet by default
+### 1. Silent until something needs you
 
-Five agents are running and the bar is empty. No noise until something needs you.
+The bar at three moments: five agents working (nothing shown), `codex` finishing (a quiet `✓`), and
+`claude` blocking on a permission prompt in another session (`⚠`). The `✓` clears the moment you
+focus that pane, with nothing to dismiss.
 
-![Quiet status bar](docs/img/quiet.png)
+![The three bar states](docs/img/states.png)
 
-### 2. A finished agent leaves a quiet check mark
+### 2. When an agent needs you
 
-`3:tests` finished. The `✓` marks the window and the bar counts it. It disappears the moment
-you focus that pane, with nothing to dismiss.
-
-![Done marker](docs/img/done.png)
-
-### 3. An agent needs you
-
-`claude` is blocked on a permission prompt in another session. The bar shows `⚠1`, and if you were
-looking at that window the marker would sit right next to it.
-
-![Waiting marker](docs/img/waiting.png)
-
-You also get a desktop toast (Omarchy's notification server, or plain `notify-send`). Clicking it
+The warning appears in the bar and, unless you're already looking at that pane, a desktop toast
+(Omarchy's notification server, or plain `notify-send`) lands at the top of the screen. Clicking it
 jumps to the pane and raises the terminal window.
+
+![Blocked agent: warning in the bar and a toast at the top of the screen](docs/img/waiting.png)
 
 ![Desktop toast](docs/img/toast.png)
 
-### 4. `prefix a` (or `prefix A`): search and jump
+### 3. `prefix a` (or `prefix A`): search and jump
 
 A popup lists every agent in every session: needs-you first, then done, then working, then agents
-that haven't reported yet (`○`, found by process name). A live preview of the selected pane is below.
+that haven't reported yet (`○`, found by process name). The preview shows the selected pane's
+latest output, here the exact command it is asking permission for.
 
-![Agent picker](docs/img/picker.png)
+![Agent picker with live preview](docs/img/picker.png)
 
 Type to filter by agent, session or window. Enter jumps.
 
 ![Agent picker filtered to "web"](docs/img/picker-search.png)
 
-### 5. Land right on the prompt
+### 4. Land right on the prompt
 
 Enter switches session, window and pane and, on Hyprland, raises the terminal.
 
-![After the jump](docs/img/jumped.png)
+![After the jump: the permission prompt](docs/img/jumped.png)
 
-Answer it and the warning clears itself (and its toast is dismissed). The finished agent's `✓`
-is still waiting for you.
+Answer it and the warning clears itself (and its toast is dismissed). The finished agent's `✓` waits
+for you.
 
-![Resolved](docs/img/resolved.png)
+![Resolved: only the finished check mark is left](docs/img/resolved.png)
 
 ## Install
 
