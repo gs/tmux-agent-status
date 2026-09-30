@@ -49,7 +49,7 @@ as "$P1" set waiting --agent claude --msg "run rm?"
 case "$(summary)" in *"⚠1"*) ok "waiting shows ⚠1";; *) bad "waiting shows ⚠1" "$(summary)";; esac
 case "$(mark "$(win "$P1")")" in *"⚠"*) ok "window marked ⚠";; *) bad "window marked" "$(mark "$(win "$P1")")";; esac
 as "$P2" set working --agent pi
-as "$P2" set done --agent pi
+as "$P2" set "done" --agent pi
 s=$(summary); case "$s" in *"⚠1"*"✓1"*) ok "waiting then done ordering";; *) bad "summary both" "$s";; esac
 
 echo "list ordering"
@@ -72,7 +72,7 @@ eq "focused seen clears ✓" "$(summary)" ""
 
 echo "done while watching leaves no record"
 FOC=1 as "$P3" set working --agent codex
-FOC=1 as "$P3" set done
+FOC=1 as "$P3" set "done"
 eq "no record for focused done" "$(as "$P3" list | grep -vc '○')" "1"   # P1 still working
 
 echo "gc: pane closed / agent back at shell"
@@ -85,6 +85,13 @@ as "$PSH" set waiting --agent claude
 as "$PSH" refresh
 eq "shell-pane record dropped" "$(as "$P1" list | cut -f1 | grep -c "^$PSH\$")" "0"
 
+echo "wrapper shells (sh -c 'agent; ...') do not look dead"
+tm respawn-pane -k -t "$P1" "sh -c 'sleep 300; true'"; sleep 0.4
+eq "foreground command is a shell (the trap)" "$(tm display-message -p -t "$P1" '#{pane_current_command}')" "sh"
+as "$P1" set working --agent claude
+eq "record survives: agent runs under the wrapper" "$(as "$P1" list | grep -c claude)" "1"
+tm respawn-pane -k -t "$P1" "exec -a claude sleep 600"; sleep 0.3; as "$P1" clear
+
 echo "notifications"
 : >"$LOG"; rm -f "$AGENT_STATUS_DIR"/*.n
 FOC=0 as "$P1" set waiting --agent claude --msg "need ok"; sleep 0.3
@@ -94,13 +101,13 @@ eq "debounced re-notify" "$(wc -l <"$LOG")" "1"
 : >"$LOG"; tm set -g @agent-status-debounce 0
 FOC=1 as "$P1" set working; FOC=1 as "$P1" set waiting; sleep 0.3
 eq "suppressed when focused" "$(wc -l <"$LOG")" "0"
-FOC=0 as "$P1" set working; FOC=0 as "$P1" set done; sleep 0.3
+FOC=0 as "$P1" set working; FOC=0 as "$P1" set "done"; sleep 0.3
 eq "done silent by default" "$(wc -l <"$LOG")" "0"
 tm set -g @agent-status-notify-done on
-FOC=0 as "$P1" set working; FOC=0 as "$P1" set done; sleep 0.3
+FOC=0 as "$P1" set working; FOC=0 as "$P1" set "done"; sleep 0.3
 eq "done notifies when enabled" "$(grep -c 'finished' "$LOG")" "1"
 tm set -g @agent-status-notify-done-min-secs 999
-: >"$LOG"; FOC=0 as "$P1" set working; FOC=0 as "$P1" set done; sleep 0.3
+: >"$LOG"; FOC=0 as "$P1" set working; FOC=0 as "$P1" set "done"; sleep 0.3
 eq "done respects min duration" "$(wc -l <"$LOG")" "0"
 tm set -g @agent-status-notify off
 FOC=0 as "$P1" set working; FOC=0 as "$P1" set waiting; sleep 0.3
@@ -110,7 +117,7 @@ echo "jump next"
 as "$P1" clear; as "$P2" clear
 as "$P1" set working --agent claude
 as "$P2" set working --agent pi
-FOC=0 as "$P2" set done; sleep 1
+FOC=0 as "$P2" set "done"; sleep 1
 FOC=0 as "$P1" set waiting
 tm select-window -t "$(win "$P2")"
 "$BIN" jump next "$CLIENT" "$P2"
@@ -126,10 +133,23 @@ tm select-window -t "$(win "$P2")"
 "$BIN" jump pane "$P1" ""
 eq "empty client falls back too" "$(tm display-message -p -c "$CLIENT" '#{pane_id}')" "$P1"
 
+echo "hardening"
+as "$P1" clear
+as "$P1" set waiting --agent "cl\$(touch $T/pwn)aude" --msg $'esc\e[31m red\ttab #(touch '"$T"'/pwn2)'
+rec=$(cat "$AGENT_STATUS_DIR"/*_"${P1#%}")
+case "$rec" in *$'\e'*) bad "control chars stripped from message" "$rec";; *) ok "control chars stripped from message";; esac
+name=$(cut -f2 <<<"$rec")
+[[ $name =~ ^[A-Za-z0-9._-]{1,32}$ ]] && ok "agent name reduced to safe chars" || bad "agent name reduced to safe chars" "$name"
+tm set -g @agent-status-tmux-message on
+as "$P1" clear; as "$P1" set working; as "$P1" set waiting --agent claude --msg 'x #(touch '"$T"'/pwn3) #{session_name}'; sleep 0.5
+[ ! -e "$T/pwn3" ] && ok "tmux banner does not expand #(...) from agent text" || bad "tmux banner does not expand #(...) from agent text" "command ran"
+[ ! -e "$T/pwn" ] && [ ! -e "$T/pwn2" ] && ok "no command substitution from agent name/message" || bad "no command substitution" "command ran"
+tm set -gu @agent-status-tmux-message
+
 echo "plugin entry is idempotent"
 tm set -g status-right "RIGHT"; tm set -gw window-status-format " #I:#W "
 tm set -g @agent-status-key-pick "" ; tm set -g @agent-status-key-next ""
-for _ in 1 2; do TMUX_PANE= "$ROOT/agent-status.tmux"; done
+for _ in 1 2; do TMUX_PANE="" "$ROOT/agent-status.tmux"; done
 eq "status-right prefixed once" "$(tm show-option -gv status-right | grep -o '@agent_summary' | wc -l)" "1"
 eq "window format marked once" "$(tm show-option -gwv window-status-format | grep -o '?@agent_mark' | wc -l)" "1"
 eq "hook installed once" "$(tm show-hooks -gw | grep -c '^pane-focus-in\[91\]')" "1"

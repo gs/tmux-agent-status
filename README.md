@@ -61,9 +61,16 @@ for you.
 
 ![Resolved: only the finished check mark is left](docs/img/resolved.png)
 
+## Requirements
+
+- **tmux ≥ 3.2** (`display-popup`, array hooks), **bash ≥ 4.2**, **fzf**, **jq** (hook adapters and `install.sh`).
+- Linux. macOS should work with a newer bash (`brew install bash`) but is untested; desktop toasts use
+  `notify-send` or Omarchy's notifier, so there are none on macOS. The bar, markers and list work anywhere.
+- Hyprland is only needed for the optional "raise the terminal window" after a toast click.
+
 ## Install
 
-**TPM:** `set -g @plugin 'you/tmux-agent-status'`. **Without TPM**, add to `tmux.conf`, *after* your
+**TPM:** `set -g @plugin '<owner>/tmux-agent-status'` (replace `<owner>` with the GitHub account hosting this repo). **Without TPM**, add to `tmux.conf`, *after* your
 status-bar options:
 
 ```tmux
@@ -86,6 +93,11 @@ Then connect the agents (each step is optional, idempotent and reversible with `
 | Codex | hooks in `~/.codex/hooks.json` | approve the new hooks once with `/hooks` |
 | opencode | plugin symlinked into `~/.config/opencode/plugin/` | sub-agent sessions are ignored |
 | pi | extension symlinked into `~/.pi/agent/extensions/` | working / done only (pi has no permission prompts) |
+
+Verified so far: **pi** (live), **Claude Code** (live: a real `claude -p` run goes working → done → cleared;
+the permission `waiting` path is covered by payload-shape tests, not a live prompt). **Codex** and
+**opencode** adapters are written against their documented events but **not yet run live**: please
+report what you see.
 
 Agents that were already running when you installed keep running without reporting: restart them
 (in pi, `/reload`). They still appear in the list as `○` because they are found by process name.
@@ -136,7 +148,8 @@ Agents push their state through hooks: `agent-status set working|waiting|done`. 
 file per pane in `$XDG_RUNTIME_DIR/agent-status-$UID/`. Every change recomputes two tmux options,
 `@agent_summary` and `@agent_mark`, so the bar updates instantly and nothing polls.
 
-- Records of closed panes, or panes whose agent quit back to a shell, are dropped automatically.
+- Records of closed panes, or panes with no process left except a shell, are dropped automatically
+  (decided from the pane's process tree, so wrappers like `sh -c "agent; …"` are fine).
 - A `done` that arrives while you are watching that pane is never recorded.
 - Everything is a silent no-op outside tmux, and hooks never fail or slow the agent.
 
@@ -148,11 +161,22 @@ agent-status jump next [CLIENT] [PANE]     # oldest agent that needs you
 agent-status jump pane PANE [CLIENT]       # what a toast click runs
 ```
 
+## Privacy and safety
+
+Everything is local: no network, no telemetry. State is a few bytes per pane in your runtime directory
+(`$XDG_RUNTIME_DIR`, mode 700; the `/tmp` fallback is only used if it is owned by you). Agent-supplied
+text (messages, names) is stripped of control characters and `#` is escaped before it reaches tmux.
+`install.sh` edits `~/.claude/settings.json` and `~/.codex/hooks.json` (backed up next to them as
+`*.bak.tmux-agent-status`) and only ever adds or removes its own entries.
+
 ## Development
 
 ```sh
-tests/run.sh          # 31 checks against a private tmux server, notifier stubbed
+tests/run.sh          # runs against a private tmux server with the notifier stubbed
+shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh
 ```
+
+CI (`.github/workflows/ci.yml`) runs both on every push.
 
 ### Regenerate the screenshots and recording
 
@@ -166,3 +190,7 @@ docs/demo/postprocess.sh   # crops stills, builds docs/img/demo.gif and demo.mp4
 
 It never touches your real tmux sessions or agents. It needs `foot`, `grim`, `wf-recorder`, `ffmpeg`,
 `magick`, `jq` and `hyprctl`.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

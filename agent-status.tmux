@@ -3,6 +3,14 @@
 #   run-shell ~/code/tmux-agent-status/agent-status.tmux
 # Idempotent: safe to source again on config reload.
 
+# Needs tmux >= 3.2 (display-popup, array hooks).
+ver=$(tmux -V | sed -E 's/[^0-9.]*([0-9]+)\.([0-9]+).*/\1 \2/')
+read -r major minor <<<"$ver"
+if [ "${major:-0}" -lt 3 ] || { [ "${major:-0}" -eq 3 ] && [ "${minor:-0}" -lt 2 ]; }; then
+  tmux display-message "tmux-agent-status: needs tmux >= 3.2 (found $(tmux -V))"
+  exit 0
+fi
+
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="$CURRENT_DIR/bin/agent-status"
 
@@ -27,8 +35,8 @@ gc="run-shell -b \"'$BIN' refresh\""
 # are session-level (-g).
 tmux set-hook -gw "pane-focus-in[91]" "$seen"
 tmux set-hook -gw "pane-exited[91]" "$gc"
-for h in client-session-changed after-select-window; do tmux set-hook -g "$h[91]" "$seen"; done
-for h in after-kill-pane window-unlinked session-closed; do tmux set-hook -g "$h[91]" "$gc"; done
+for h in client-session-changed after-select-window; do tmux set-hook -g "${h}[91]" "$seen"; done
+for h in after-kill-pane window-unlinked session-closed; do tmux set-hook -g "${h}[91]" "$gc"; done
 
 # Bar segment + window marker, added only if not already present.
 tmux set-option -gq @agent_summary ""

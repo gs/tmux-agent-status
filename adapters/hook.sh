@@ -17,7 +17,7 @@ case $event in
   PermissionRequest)
     "$BIN" set waiting --agent "$agent" --msg "permission: $(field tool_name)" ;;
   Stop)
-    "$BIN" set done --agent "$agent" ;;
+    "$BIN" set "done" --agent "$agent" ;;
   SessionEnd)
     "$BIN" clear ;;
 esac >/dev/null 2>&1

@@ -1,0 +1,15 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tmux, fzf, jq, shellcheck
+        run: sudo apt-get update && sudo apt-get install -y tmux fzf jq shellcheck
+      - name: Versions
+        run: tmux -V && bash --version | head -1 && fzf --version
+      - name: shellcheck
+        run: shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh tests/run.sh docs/demo/*.sh
+      - name: Tests
+        run: tests/run.sh
