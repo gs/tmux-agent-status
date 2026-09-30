@@ -147,6 +147,20 @@ tm bind-key -T prefix z run-shell "true"; TMUX_PANE="" "$ROOT/agent-status.tmux"
 case "$(tm list-keys -T prefix | grep ' a ')" in *"agent-status' open"*) ok "key a is bound to 'open'";; *) bad "key a is bound to open" "$(tm list-keys -T prefix | grep ' a ')";; esac
 as "$P1" clear
 
+echo "degrades without ps / jq"
+tm respawn-pane -k -t "$PSH" "bash --norc -i"; sleep 0.3
+as "$PSH" set waiting --agent claude; AGENT_STATUS_NO_PS=1 as "$PSH" refresh
+eq "no ps: shell pane still dropped via foreground command" "$(as "$P1" list | cut -f1 | grep -c "^$PSH\$")" "0"
+as "$P1" clear; as "$P1" set working --agent claude; AGENT_STATUS_NO_PS=1 as "$P1" refresh
+eq "no ps: reported agent is kept, nothing mass-deleted" "$(as "$P1" list | grep -v '○' | grep -c claude)" "1"
+as "$P1" clear
+export AGENT_STATUS_PANE=$P1 AGENT_STATUS_FOCUSED=0
+echo '{"notification_type":"idle_prompt","message":"m"}' | AGENT_STATUS_NO_JQ=1 "$ROOT/adapters/hook.sh" claude Notification
+eq "no jq: idle_prompt is not treated as waiting" "$(as "$P1" list | grep -v '○' | grep -c claude)" "0"
+echo '{"notification_type":"permission_prompt","message":"needs Bash"}' | AGENT_STATUS_NO_JQ=1 "$ROOT/adapters/hook.sh" claude Notification
+eq "no jq: permission prompt is waiting, message parsed" "$(as "$P1" list | grep -c 'needs Bash')" "1"
+as "$P1" clear; unset AGENT_STATUS_PANE AGENT_STATUS_FOCUSED
+
 echo "hardening"
 as "$P1" clear
 as "$P1" set waiting --agent "cl\$(touch $T/pwn)aude" --msg $'esc\e[31m red\ttab #(touch '"$T"'/pwn2)'

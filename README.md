@@ -61,11 +61,24 @@ for you.
 
 ## Requirements
 
-- **tmux ≥ 3.2** (`display-popup`, array hooks), **bash ≥ 4.2**, **jq** (hook adapters and `install.sh`).
-- **fzf** for the searchable popup. Without it, `prefix a` opens a plain tmux menu instead (numbered, no search).
-- Linux. macOS should work with a newer bash (`brew install bash`) but is untested; desktop toasts use
-  `notify-send` or Omarchy's notifier, so there are none on macOS. The bar, markers and list work anywhere.
-- Hyprland is only needed for the optional "raise the terminal window" after a toast click.
+| need | why | notes |
+|---|---|---|
+| **tmux ≥ 3.2** | `display-popup`, array hooks | required |
+| **bash ≥ 4.2** | associative arrays | required. macOS ships 3.2: `brew install bash` |
+| **git** | clone / TPM | to install |
+| **procps** (`ps`) | knows when an agent has really exited | required in practice; without it the plugin falls back to the foreground command name, which is less reliable for wrapper scripts |
+| **coreutils, sed, awk, util-linux** (`readlink -f`, `sort`, `timeout`, `flock`) | ordinary plumbing | present on any normal Linux; `flock` is optional |
+| **fzf** | the searchable popup | optional. Without it `prefix a` opens a plain numbered tmux menu |
+| **jq** | `install.sh` editing your agents' JSON configs | needed to run `install.sh`; the hooks themselves work without it |
+| **notify-send** (`libnotify`) or **Omarchy** | desktop toasts | optional. Without either there are simply no toasts |
+| **Hyprland** (`hyprctl`) | raise the terminal window after a toast click | optional |
+
+Debian/Ubuntu: `sudo apt install tmux git jq fzf libnotify-bin` (the rest is normally preinstalled).
+Arch: `sudo pacman -S tmux git jq fzf libnotify`.
+
+Linux is what it's developed and tested on. macOS should work for the bar, markers and list with a newer
+bash, but it is untested and has no toasts. The pi and opencode adapters run inside those agents' own
+runtimes (Node), so they need nothing extra.
 
 ## Install
 

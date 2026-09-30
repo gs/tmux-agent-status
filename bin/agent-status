@@ -84,12 +84,15 @@ focused() {
 # process tree. Looking only at pane_current_command is wrong for wrappers that
 # do not exec (sh -c "agent; ...", npx, shims): the foreground name is then "sh".
 declare -A PS_COMM PS_KIDS
+PS_OK=0
 load_ps() {
   local pid ppid comm
-  PS_COMM=() PS_KIDS=()
+  PS_COMM=() PS_KIDS=() PS_OK=0
+  [ -z "${AGENT_STATUS_NO_PS:-}" ] && command -v ps >/dev/null 2>&1 || return 0
   while read -r pid ppid comm; do
     PS_COMM[$pid]=$comm PS_KIDS[$ppid]+=" $pid"
   done < <(ps -e -o pid=,ppid=,comm= 2>/dev/null)
+  [ "${#PS_COMM[@]}" -gt 0 ] && PS_OK=1     # 0 = no usable ps: use the foreground command instead
 }
 TREE_ALIVE=0 TREE_NAME=""
 tree_scan() { # root pid -> TREE_ALIVE (non-shell process present), TREE_NAME (known agent name)
@@ -123,8 +126,10 @@ scan() {
     [[ $n =~ ^[0-9]+$ ]] || continue
     pane="%$n"
     if [ -z "${P_WIN[$pane]:-}" ]; then rm -f "$f" "$f.n"; continue; fi
-    tree_scan "${P_PID[$pane]}"
-    if [ "$TREE_ALIVE" = 0 ]; then rm -f "$f" "$f.n"; continue; fi
+    if [ "$PS_OK" = 1 ]; then
+      tree_scan "${P_PID[$pane]}"
+      [ "$TREE_ALIVE" = 1 ] || { rm -f "$f" "$f.n"; continue; }
+    elif is_shell "${P_CMD[$pane]}"; then rm -f "$f" "$f.n"; continue; fi
     read_rec "$f" || continue
     case $R_STATE in
       waiting) rank=0 ;; done) rank=1 ;; working) rank=2 ;;
@@ -140,7 +145,7 @@ scan() {
     [ -n "${KNOWN[$pane]:-}" ] && continue
     name=""
     case " $AGENT_NAMES " in *" ${P_CMD[$pane]} "*) name=${P_CMD[$pane]} ;; esac
-    if [ -z "$name" ]; then tree_scan "${P_PID[$pane]}"; name=$TREE_NAME; fi
+    if [ -z "$name" ] && [ "$PS_OK" = 1 ]; then tree_scan "${P_PID[$pane]}"; name=$TREE_NAME; fi
     [ -n "$name" ] && RECS+=("3"$'\t'"0"$'\t'"$pane"$'\t'"running"$'\t'"$name"$'\t'"")
   done
 }
