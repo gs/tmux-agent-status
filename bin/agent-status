@@ -193,49 +193,25 @@ refresh() {
   tmux "${args[@]}" set-option -g @agent_summary "$sum" ';' refresh-client -S 2>/dev/null
 }
 
-# ---------------------------------------------------------- notifications --
+# ------------------------------------------------------------------ banner --
 pane_loc() { tmux display-message -p -t "$1" '#{session_name}:#{window_name}#{?#{>:#{window_panes},1}, (pane #{pane_index}),}' 2>/dev/null; }
 
-notify() { # pane state agent msg
-  local pane=$1 state=$2 agent=$3 msg=$4 title body loc
-  loc=$(pane_loc "$pane")
-  case $state in
-    waiting) title="$agent needs you · $loc" ;;
-    done)    title="$agent finished · $loc" ;;
-    *) return ;;
-  esac
-  body=${msg:-$loc}
-  if truthy "$(opt tmux-message off)"; then
-    local c
-    local safe="$title  ($body)"; safe=${safe//#/##}     # tmux would run #(...) otherwise
-    while read -r c; do tmux display-message -c "$c" -d 5000 "$safe" 2>/dev/null; done \
-      < <(tmux list-clients -F '#{client_name}' 2>/dev/null)
-  fi
-  if [ -n "${AGENT_STATUS_NOTIFY_CMD:-}" ]; then
-    ( "$AGENT_STATUS_NOTIFY_CMD" "$title" "$body" >/dev/null 2>&1 & )
-  elif command -v omarchy-notification-send >/dev/null 2>&1; then
-    # Omarchy toast: urgency per state, glyph, click jumps to the pane.
-    local urg glyph
-    if [ "$state" = waiting ]; then urg=$(opt urgency-waiting critical); glyph=$(opt glyph-waiting '󰀪')
-    else urg=$(opt urgency-done normal); glyph=$(opt glyph-done '󰄬'); fi
-    ( omarchy-notification-send --app-name tmux-agent-status -u "$urg" -g "$glyph" "$title" "$body" \
-        --exec env "TMUX=$TMUX" "$SELF" jump pane "$pane" >/dev/null 2>&1 & )
-  elif command -v notify-send >/dev/null 2>&1; then
-    ( timeout 3 notify-send -a tmux-agent-status -u normal -- "$title" "$body" >/dev/null 2>&1 & )
-  fi
+# Optional: a short message on every client's status line when an agent starts
+# waiting. tmux only: nothing outside the terminal is ever touched.
+banner() { # pane agent msg
+  local text c
+  text="$2 needs you · $(pane_loc "$1")${3:+ — $3}"
+  text=${text//#/##}                       # agent text must not be format-expanded
+  while read -r c; do
+    tmux display-message -c "$c" -d "$(opt banner-ms 5000)" "$text" 2>/dev/null
+  done < <(tmux list-clients -F '#{client_name}' 2>/dev/null)
 }
 
-should_notify() { # pane state prev wstart
-  local pane=$1 state=$2 prev=$3 wstart=$4
-  truthy "$(opt notify on)" || return 1
-  case $state in
-    waiting) [ "$prev" != waiting ] || return 1 ;;
-    done)
-      truthy "$(opt notify-done off)" || return 1
-      [ $((NOW - wstart)) -ge "$(opt notify-done-min-secs 0)" ] || return 1 ;;
-    *) return 1 ;;
-  esac
-  focused "$pane" && return 1
+should_banner() { # pane state prev
+  local pane=$1 state=$2 prev=$3
+  truthy "$(opt banner off)" || return 1
+  [ "$state" = waiting ] && [ "$prev" != waiting ] || return 1
+  focused "$pane" && return 1              # you are looking at it already
   local stamp last=0
   rec_path "$pane"; stamp="$REC.n"
   [ -r "$stamp" ] && read -r last <"$stamp"
@@ -245,12 +221,6 @@ should_notify() { # pane state prev wstart
 }
 
 # --------------------------------------------------------------- commands --
-dismiss_toast() { # pane: best effort, only the toast this pane raised
-  command -v omarchy-notification-dismiss >/dev/null 2>&1 || return 0
-  [ -z "${AGENT_STATUS_NOTIFY_CMD:-}" ] || return 0
-  ( omarchy-notification-dismiss "needs you · $(pane_loc "$1")" >/dev/null 2>&1 & )
-}
-
 cmd_set() {
   local state=${1:-}; shift || true
   local agent="" msg=""
@@ -273,7 +243,6 @@ cmd_set() {
   fi
   [ -n "$agent" ] || agent=agent
   [ "$prev" = "$state" ] && exit 0            # unchanged: hot path for tool hooks
-  [ "$prev" = waiting ] && dismiss_toast "$pane"
   [ "$state" = working ] && wstart=$NOW
   [ -n "$wstart" ] || wstart=$NOW
   msg=${msg//[[:cntrl:]]/ }; msg=${msg:0:200}
@@ -285,7 +254,7 @@ cmd_set() {
   else
     write_rec "$f" "$state" "$agent" "$since" "$wstart" "$msg"
   fi
-  should_notify "$pane" "$state" "$prev" "$wstart" && notify "$pane" "$state" "$agent" "$msg"
+  should_banner "$pane" "$state" "$prev" && banner "$pane" "$agent" "$msg"
   refresh
 }
 
@@ -294,7 +263,6 @@ cmd_clear() {
   [ -n "$pane" ] || exit 0
   rec_path "$pane"
   [ -e "$REC" ] || exit 0
-  read_rec "$REC" && [ "$R_STATE" = waiting ] && dismiss_toast "$pane"
   rm -f "$REC" "$REC.n"
   refresh
 }
@@ -355,18 +323,6 @@ jump_to() { # pane [client]
        select-window -t "$win" ';' select-pane -t "$pane"
 }
 
-# Best effort: raise the Hyprland window hosting this tmux client.
-focus_terminal() { # client
-  command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 0
-  local pid addr
-  pid=$(tmux display-message -p -c "$1" '#{client_pid}' 2>/dev/null)
-  while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
-    addr=$(hyprctl clients -j 2>/dev/null | jq -r --argjson p "$pid" '.[] | select(.pid == $p) | .address' 2>/dev/null | head -1)
-    if [ -n "$addr" ]; then hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1; return 0; fi
-    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
-  done
-}
-
 has_fzf() { [ -z "${AGENT_STATUS_NO_FZF:-}" ] && command -v fzf >/dev/null 2>&1; }   # env: test/opt-out
 
 # Plain tmux menu, used when fzf is not installed (no search, keys 1-9 then a-z).
@@ -417,13 +373,11 @@ cmd_pick() {
       --preview-window=down:40%:wrap:follow | cut -f1) || exit 0
   [ -n "$pane" ] || exit 0
   jump_to "$pane" "$client" || tmux display-message "agent-status: could not jump to $pane"
-  focus_terminal "$(resolve_client "$client")"
 }
 
 cmd_jump() {
-  if [ "${1:-}" = pane ]; then       # notification click: jump + raise the terminal
-    local client; client=$(resolve_client "${3:-}")
-    jump_to "${2:-}" "$client" && [ -n "$client" ] && focus_terminal "$client"
+  if [ "${1:-}" = pane ]; then       # used by the menu: jump to one pane
+    jump_to "${2:-}" "$(resolve_client "${3:-}")"
     exit 0
   fi
   [ "${1:-next}" = next ] || { echo "usage: jump next|pane ..." >&2; exit 2; }

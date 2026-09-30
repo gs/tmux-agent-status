@@ -9,9 +9,6 @@ tm() { tmux -L "$SOCKNAME" "$@"; }
 cleanup() { pkill -P $$ sleep 2>/dev/null; tm kill-server 2>/dev/null; rm -rf "$T"; }
 trap cleanup EXIT
 
-LOG="$T/notify.log"; : >"$LOG"
-printf '#!/bin/sh\necho "$1|$2" >>"%s"\n' "$LOG" >"$T/nstub"; chmod +x "$T/nstub"
-export AGENT_STATUS_NOTIFY_CMD="$T/nstub"   # never touch the real desktop
 pass=0 fail=0
 ok()   { pass=$((pass + 1)); printf '  ok   %s\n' "$1"; }
 bad()  { fail=$((fail + 1)); printf '  FAIL %s\n       %s\n' "$1" "${2:-}"; }
@@ -92,26 +89,25 @@ as "$P1" set working --agent claude
 eq "record survives: agent runs under the wrapper" "$(as "$P1" list | grep -c claude)" "1"
 tm respawn-pane -k -t "$P1" "exec -a claude sleep 600"; sleep 0.3; as "$P1" clear
 
-echo "notifications"
-: >"$LOG"; rm -f "$AGENT_STATUS_DIR"/*.n
-FOC=0 as "$P1" set waiting --agent claude --msg "need ok"; sleep 0.3
-eq "notify on waiting (unfocused)" "$(grep -c 'claude needs you' "$LOG")" "1"
+echo "banner (tmux status line only)"
+rm -f "$AGENT_STATUS_DIR"/*.n
+msgs() { tm show-messages -t "$CLIENT" 2>/dev/null | grep -c 'needs you'; }
+base=$(msgs)
+FOC=0 as "$P1" set working --agent claude; FOC=0 as "$P1" set waiting --agent claude --msg "need ok"
+eq "banner is off by default" "$(( $(msgs) - base ))" "0"
+tm set -g @agent-status-banner on
+FOC=0 as "$P1" set working; FOC=0 as "$P1" set waiting --msg "need ok"; sleep 0.3
+eq "banner shows when an agent starts waiting" "$(( $(msgs) - base ))" "1"
+tm show-messages -t "$CLIENT" | grep -q 'claude needs you · main:.*need ok' && ok "banner text: agent, place, message" || bad "banner text" "$(tm show-messages -t "$CLIENT" | tail -2)"
 FOC=0 as "$P1" set working; FOC=0 as "$P1" set waiting; sleep 0.3
-eq "debounced re-notify" "$(wc -l <"$LOG")" "1"
-: >"$LOG"; tm set -g @agent-status-debounce 0
+eq "debounced: no second banner within 10s" "$(( $(msgs) - base ))" "1"
+tm set -g @agent-status-debounce 0
 FOC=1 as "$P1" set working; FOC=1 as "$P1" set waiting; sleep 0.3
-eq "suppressed when focused" "$(wc -l <"$LOG")" "0"
+eq "no banner when you are looking at the pane" "$(( $(msgs) - base ))" "1"
 FOC=0 as "$P1" set working; FOC=0 as "$P1" set "done"; sleep 0.3
-eq "done silent by default" "$(wc -l <"$LOG")" "0"
-tm set -g @agent-status-notify-done on
-FOC=0 as "$P1" set working; FOC=0 as "$P1" set "done"; sleep 0.3
-eq "done notifies when enabled" "$(grep -c 'finished' "$LOG")" "1"
-tm set -g @agent-status-notify-done-min-secs 999
-: >"$LOG"; FOC=0 as "$P1" set working; FOC=0 as "$P1" set "done"; sleep 0.3
-eq "done respects min duration" "$(wc -l <"$LOG")" "0"
-tm set -g @agent-status-notify off
-FOC=0 as "$P1" set working; FOC=0 as "$P1" set waiting; sleep 0.3
-eq "notify=off silences" "$(wc -l <"$LOG")" "0"
+eq "done never shows a banner" "$(( $(msgs) - base ))" "1"
+tm set -gu @agent-status-banner; tm set -gu @agent-status-debounce
+as "$P1" clear
 
 echo "jump next"
 as "$P1" clear; as "$P2" clear
@@ -168,11 +164,11 @@ rec=$(cat "$AGENT_STATUS_DIR"/*_"${P1#%}")
 case "$rec" in *$'\e'*) bad "control chars stripped from message" "$rec";; *) ok "control chars stripped from message";; esac
 name=$(cut -f2 <<<"$rec")
 [[ $name =~ ^[A-Za-z0-9._-]{1,32}$ ]] && ok "agent name reduced to safe chars" || bad "agent name reduced to safe chars" "$name"
-tm set -g @agent-status-tmux-message on
+tm set -g @agent-status-banner on
 as "$P1" clear; as "$P1" set working; as "$P1" set waiting --agent claude --msg 'x #(touch '"$T"'/pwn3) #{session_name}'; sleep 0.5
 [ ! -e "$T/pwn3" ] && ok "tmux banner does not expand #(...) from agent text" || bad "tmux banner does not expand #(...) from agent text" "command ran"
 [ ! -e "$T/pwn" ] && [ ! -e "$T/pwn2" ] && ok "no command substitution from agent name/message" || bad "no command substitution" "command ran"
-tm set -gu @agent-status-tmux-message
+tm set -gu @agent-status-banner
 
 echo "plugin entry is idempotent"
 tm set -g status-right "RIGHT"; tm set -gw window-status-format " #I:#W "
