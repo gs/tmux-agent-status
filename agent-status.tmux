@@ -37,7 +37,7 @@ if ! off @agent-status-modify-status; then
   case $cur in *@agent_summary*) ;; *) tmux set-option -g status-right "#{@agent_summary}$cur" ;; esac
 fi
 if ! off @agent-status-modify-window-format; then
-  add='#{?@agent_mark, #{@agent_mark},}'
+  add='#{?@agent_mark,#{@agent_mark} ,}'   # sits right after the name it belongs to
   for o in window-status-format window-status-current-format; do
     cur=$(tmux show-option -gwv "$o")
     case $cur in *@agent_mark*) ;; *) tmux set-option -gw "$o" "$cur$add" ;; esac

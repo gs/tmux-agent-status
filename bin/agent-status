@@ -60,7 +60,7 @@ load_panes() {
   while IFS=$'\t' read -r pid win loc cmd; do
     P_WIN[$pid]=$win P_LOC[$pid]=$loc P_CMD[$pid]=$cmd
   done < <(tmux list-panes -a -F \
-    "#{pane_id}"$'\t'"#{window_id}"$'\t'"#{session_name}:#{window_index}.#{pane_index}"$'\t'"#{pane_current_command}" 2>/dev/null)
+    "#{pane_id}"$'\t'"#{window_id}"$'\t'"#{session_name}:#{window_name}#{?#{>:#{window_panes},1}, (pane #{pane_index}),}"$'\t'"#{pane_current_command}" 2>/dev/null)
 }
 
 # Is the user looking at this pane right now?
@@ -149,15 +149,17 @@ refresh() {
 }
 
 # ---------------------------------------------------------- notifications --
+pane_loc() { tmux display-message -p -t "$1" '#{session_name}:#{window_name}#{?#{>:#{window_panes},1}, (pane #{pane_index}),}' 2>/dev/null; }
+
 notify() { # pane state agent msg
   local pane=$1 state=$2 agent=$3 msg=$4 title body loc
-  loc=$(tmux display-message -p -t "$pane" '#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null)
+  loc=$(pane_loc "$pane")
   case $state in
-    waiting) title="$agent needs you" ;;
-    done)    title="$agent finished" ;;
+    waiting) title="$agent needs you · $loc" ;;
+    done)    title="$agent finished · $loc" ;;
     *) return ;;
   esac
-  body="$loc${msg:+ — $msg}"
+  body=${msg:-$loc}
   if truthy "$(opt tmux-message off)"; then
     local c
     while read -r c; do tmux display-message -c "$c" -d 5000 "$title  ($body)" 2>/dev/null; done \
@@ -197,6 +199,12 @@ should_notify() { # pane state prev wstart
 }
 
 # --------------------------------------------------------------- commands --
+dismiss_toast() { # pane: best effort, only the toast this pane raised
+  command -v omarchy-notification-dismiss >/dev/null 2>&1 || return 0
+  [ -z "${AGENT_STATUS_NOTIFY_CMD:-}" ] || return 0
+  ( omarchy-notification-dismiss "needs you · $(pane_loc "$1")" >/dev/null 2>&1 & )
+}
+
 cmd_set() {
   local state=${1:-}; shift || true
   local agent="" msg=""
@@ -219,6 +227,7 @@ cmd_set() {
   fi
   [ -n "$agent" ] || agent=agent
   [ "$prev" = "$state" ] && exit 0            # unchanged: hot path for tool hooks
+  [ "$prev" = waiting ] && dismiss_toast "$pane"
   [ "$state" = working ] && wstart=$NOW
   [ -n "$wstart" ] || wstart=$NOW
   msg=${msg//[$'\t\n\r']/ }; msg=${msg:0:200}
@@ -238,6 +247,7 @@ cmd_clear() {
   [ -n "$pane" ] || exit 0
   rec_path "$pane"
   [ -e "$REC" ] || exit 0
+  read_rec "$REC" && [ "$R_STATE" = waiting ] && dismiss_toast "$pane"
   rm -f "$REC" "$REC.n"
   refresh
 }
