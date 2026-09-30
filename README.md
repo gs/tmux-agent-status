@@ -176,19 +176,6 @@ shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux ins
 
 CI (`.github/workflows/ci.yml`) runs both on every push.
 
-### Regenerate the screenshots and recording
-
-`docs/demo/` drives a real terminal (foot on Hyprland) attached to an isolated tmux server with fake
-agents, grabs stills with `grim`, records with `wf-recorder`, and builds the GIF with `ffmpeg`:
-
-```sh
-docs/demo/record.sh        # uses workspace 15; restores your workspace, pointer and DND afterwards
-docs/demo/postprocess.sh   # crops the stills; also builds a gif/mp4 in docs/img/raw (git-ignored)
-```
-
-It never touches your real tmux sessions or agents. It needs `foot`, `grim`, `wf-recorder`, `ffmpeg`,
-`magick`, `jq` and `hyprctl`.
-
 ## License
 
 Public domain ([Unlicense](LICENSE)). Copy it, change it, sell it, no attribution needed.

@@ -10,6 +10,6 @@ jobs:
       - name: Versions
         run: tmux -V && bash --version | head -1 && fzf --version
       - name: shellcheck
-        run: shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh tests/run.sh docs/demo/*.sh
+        run: shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh tests/run.sh
       - name: Tests
         run: tests/run.sh
