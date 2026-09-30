@@ -133,6 +133,20 @@ tm select-window -t "$(win "$P2")"
 "$BIN" jump pane "$P1" ""
 eq "empty client falls back too" "$(tm display-message -p -c "$CLIENT" '#{pane_id}')" "$P1"
 
+echo "fzf-less menu + key entry point"
+as "$P1" clear; as "$P1" set working --agent claude; as "$P1" set waiting --agent claude --msg 'ok #(x)'
+# display-menu blocks until dismissed, so a *valid* menu means "still running at the timeout" (124);
+# a bad command line would fail at once with a message.
+out=$(timeout 2 "$BIN" menu "$CLIENT" 2>&1); rc=$?
+eq "menu is valid and shown (no fzf needed)" "$rc:$out" "124:"
+tm send-keys -K -c "$CLIENT" Escape; sleep 0.3
+out=$(AGENT_STATUS_NO_FZF=1 AGENT_STATUS_PANE=$P1 timeout 2 "$BIN" open "$CLIENT" 2>&1); rc=$?
+eq "open falls back to the menu when fzf is missing" "$rc:$out" "124:"
+tm send-keys -K -c "$CLIENT" Escape; sleep 0.3
+tm bind-key -T prefix z run-shell "true"; TMUX_PANE="" "$ROOT/agent-status.tmux"
+case "$(tm list-keys -T prefix | grep ' a ')" in *"agent-status' open"*) ok "key a is bound to 'open'";; *) bad "key a is bound to open" "$(tm list-keys -T prefix | grep ' a ')";; esac
+as "$P1" clear
+
 echo "hardening"
 as "$P1" clear
 as "$P1" set waiting --agent "cl\$(touch $T/pwn)aude" --msg $'esc\e[31m red\ttab #(touch '"$T"'/pwn2)'

@@ -6,7 +6,9 @@
 #   agent-status seen [PANE]      clear a "done" the user is now looking at
 #   agent-status refresh          gc dead panes, rebuild bar + window markers
 #   agent-status list             TSV for fzf: pane <TAB> display line
+#   agent-status open [CLIENT]    what the key runs: fzf popup, or a plain menu without fzf
 #   agent-status pick [CLIENT]    fzf popup over all agents, jump on <enter>
+#   agent-status menu [CLIENT]    plain tmux menu (no fzf needed)
 #   agent-status jump next [CLIENT] [CURRENT_PANE]
 #
 # State lives in $XDG_RUNTIME_DIR/agent-status/<tmux-socket>_<pane-number>,
@@ -360,7 +362,45 @@ focus_terminal() { # client
   done
 }
 
+has_fzf() { [ -z "${AGENT_STATUS_NO_FZF:-}" ] && command -v fzf >/dev/null 2>&1; }   # env: test/opt-out
+
+# Plain tmux menu, used when fzf is not installed (no search, keys 1-9 then a-z).
+cmd_menu() {
+  local client rank since pane st agent msg icon label i=0
+  client=$(resolve_client "${1:-}")
+  scan
+  local -a items=()
+  local keys=(1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z)
+  while IFS=$'\t' read -r rank since pane st agent msg; do
+    [ -n "$pane" ] || continue
+    [ "$i" -lt ${#keys[@]} ] || break
+    case $st in waiting) icon="⚠" ;; done) icon="✓" ;; working) icon="●" ;; *) icon="○" ;; esac
+    label="$icon $agent  ${P_LOC[$pane]:-?}${msg:+  $msg}"
+    label=${label//#/##}                      # menu labels are format-expanded by tmux
+    items+=("$label" "${keys[$i]}" "run-shell \"'$SELF' jump pane '$pane' '$client'\"")
+    i=$((i + 1))
+  done < <(sorted_recs)
+  if [ "$i" -eq 0 ]; then
+    tmux display-message ${client:+-c "$client"} "agent-status: no agents running"
+    return 0
+  fi
+  tmux display-menu ${client:+-c "$client"} -T " agents " -x C -y C "${items[@]}"
+}
+
+# Entry point for the key binding: fzf popup if fzf exists, else the menu.
+cmd_open() {
+  local client; client=$(resolve_client "${1:-}")
+  if has_fzf; then
+    tmux display-popup ${client:+-c "$client"} -E -w 80% -h 70% -T " agents " "'$SELF' pick '$client'"
+  else
+    cmd_menu "$client"
+  fi
+}
+
 cmd_pick() {
+  if ! has_fzf; then
+    printf 'agent-status: fzf is not installed (falling back to the menu is automatic for the key binding).\n'; sleep 3; exit 0
+  fi
   local client=${1:-} out pane
   out=$(cmd_list)
   if [ -z "$out" ]; then
@@ -404,6 +444,8 @@ case ${1:-} in
   refresh) refresh ;;
   list)    cmd_list ;;
   pick)    shift; cmd_pick "$@" ;;
+  open)    shift; cmd_open "$@" ;;
+  menu)    shift; cmd_menu "$@" ;;
   jump)    shift; cmd_jump "$@" ;;
   *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

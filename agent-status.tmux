@@ -23,7 +23,7 @@ key_pick=$(get @agent-status-key-pick "a A")
 key_next=$(get @agent-status-key-next "")
 for k in $key_pick; do
   tmux bind-key -N "Agent list (search + jump)" "$k" \
-    run-shell "tmux display-popup -c '#{client_name}' -E -w 80% -h 70% -T ' agents ' \"'$BIN' pick '#{client_name}'\""
+    run-shell "'$BIN' open '#{client_name}'"
 done
 [ -n "$key_next" ] && tmux bind-key -N "Jump to next agent that needs you" "$key_next" \
   run-shell "'$BIN' jump next '#{client_name}' '#{pane_id}'"

@@ -61,7 +61,8 @@ for you.
 
 ## Requirements
 
-- **tmux ≥ 3.2** (`display-popup`, array hooks), **bash ≥ 4.2**, **fzf**, **jq** (hook adapters and `install.sh`).
+- **tmux ≥ 3.2** (`display-popup`, array hooks), **bash ≥ 4.2**, **jq** (hook adapters and `install.sh`).
+- **fzf** for the searchable popup. Without it, `prefix a` opens a plain tmux menu instead (numbered, no search).
 - Linux. macOS should work with a newer bash (`brew install bash`) but is untested; desktop toasts use
   `notify-send` or Omarchy's notifier, so there are none on macOS. The bar, markers and list work anywhere.
 - Hyprland is only needed for the optional "raise the terminal window" after a toast click.
@@ -104,7 +105,7 @@ Agents that were already running when you installed keep running without reporti
 
 | key | action |
 |---|---|
-| `prefix a` / `prefix A` | searchable agent list, enter jumps (`Esc` closes) |
+| `prefix a` / `prefix A` | searchable agent list, enter jumps (`Esc` closes); a plain menu if fzf isn't installed |
 | `@agent-status-key-next` (unbound by default) | one key: jump to the oldest agent that needs you |
 
 ## Notifications
