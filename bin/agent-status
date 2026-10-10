@@ -90,6 +90,12 @@ load_ps() {
   PS_COMM=() PS_KIDS=() PS_OK=0
   [ -z "${AGENT_STATUS_NO_PS:-}" ] && command -v ps >/dev/null 2>&1 || return 0
   while read -r pid ppid comm; do
+    # macOS reports the path a process was exec'd with rather than a basename, and
+    # a login shell with a leading "-" ("-zsh"). Normalize both, so is_shell and
+    # the TREE_NAME match behave the same everywhere -- Linux comm is already a
+    # bare basename, and a path or leading "-" there is not a shell name either.
+    comm=${comm##*/}
+    comm=${comm#-}
     PS_COMM[$pid]=$comm PS_KIDS[$ppid]+=" $pid"
   done < <(ps -e -o pid=,ppid=,comm= 2>/dev/null)
   [ "${#PS_COMM[@]}" -gt 0 ] && PS_OK=1     # 0 = no usable ps: use the foreground command instead
