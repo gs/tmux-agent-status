@@ -82,6 +82,37 @@ as "$PSH" set waiting --agent claude
 as "$PSH" refresh
 eq "shell-pane record dropped" "$(as "$P1" list | cut -f1 | grep -c "^$PSH\$")" "0"
 
+echo "macOS-shaped ps output (exec path, login shell)"
+# macOS `ps -o comm=` is not a basename: it is the path the process was exec'd
+# with, and a login shell carries a leading "-" ("-zsh"). Either shape defeats a
+# basename-only is_shell check, so on macOS a record for a pane that is back at
+# a shell is never garbage-collected. Re-run the drop above with ps reporting
+# those shapes; the real ps is used underneath, only the comm column is faked.
+mkdir -p "$T/fakebin"
+cat > "$T/fakebin/ps" <<'FAKE'
+#!/usr/bin/env bash
+real=
+for c in /usr/bin/ps /bin/ps; do [ -x "$c" ] && { real=$c; break; }; done
+[ -n "$real" ] || exit 1
+"$real" "$@" | awk -v style="${FAKE_PS_STYLE:-path}" '
+  { c = $NF
+    if (c ~ /^(bash|sh|zsh|dash|ksh|fish|tcsh|login)$/) $NF = (style == "login" ? "-" : "/bin/") c
+    print }'
+FAKE
+chmod +x "$T/fakebin/ps"
+for style in path login; do
+  tm respawn-pane -k -t "$PSH" "bash --norc -i"; sleep 0.3
+  rec="$AGENT_STATUS_DIR/${SOCKNAME}_${PSH#%}"
+  # Write the record directly: `set` runs the gc itself, so a shell pane's record
+  # would be dropped before it could be observed. This is the state an agent that
+  # reported and then exited leaves behind.
+  printf 'waiting\tclaude\t1\t1\t\n' > "$rec"
+  FAKE_PS_STYLE=$style PATH="$T/fakebin:$PATH" as "$PSH" refresh
+  [ -e "$rec" ] && bad "shell-pane record gc'd with macOS ps shape '$style'" "record survived" \
+                || ok "shell-pane record gc'd with macOS ps shape '$style'"
+done
+as "$PSH" clear
+
 echo "wrapper shells (sh -c 'agent; ...') do not look dead"
 tm respawn-pane -k -t "$P1" "sh -c 'sleep 300; true'"; sleep 0.4
 eq "foreground command is a shell (the trap)" "$(tm display-message -p -t "$P1" '#{pane_current_command}')" "sh"
