@@ -1,4 +1,4 @@
-// opencode plugin: reports session state to tmux-agent-status.
+// OpenCode V1 plugin: reports session state to tmux-agent-status.
 import { spawn } from "node:child_process"
 
 const BIN = process.env.AGENT_STATUS_BIN || "agent-status"

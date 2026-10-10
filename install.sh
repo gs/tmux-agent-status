@@ -12,10 +12,14 @@ target=${1:-all}; action=install; [ "${2:-}" = --uninstall ] && action=uninstall
 
 link() { # src dst
   if [ "$action" = uninstall ]; then
-    if [ -L "$2" ]; then rm -f "$2"; echo "removed $2"; fi
+    unlink "$2"
     return 0
   fi
   mkdir -p "$(dirname "$2")"; ln -sfn "$1" "$2"; echo "linked $2 -> $1"
+}
+
+unlink() { # dst
+  if [ -L "$1" ]; then rm -f "$1"; echo "removed $1"; fi
 }
 
 # jq-merge hook entries "Event:command" into a Claude/Codex style hooks JSON file.
@@ -47,7 +51,31 @@ json_hooks() { # file agent events...
 do_claude()   { json_hooks "$HOME/.claude/settings.json" claude UserPromptSubmit PostToolUse Notification Stop SessionEnd; }
 do_codex()    { json_hooks "$HOME/.codex/hooks.json" codex UserPromptSubmit PostToolUse PermissionRequest Stop
                 if [ "$action" = install ]; then echo "codex: review the new hooks in codex (/hooks) so they are trusted"; fi; }
-do_opencode() { link "$ROOT/adapters/opencode/tmux-agent-status.js" "$HOME/.config/opencode/plugin/tmux-agent-status.js"; }
+do_opencode() {
+  local version v1="$HOME/.config/opencode/plugin/tmux-agent-status.js" v2="$HOME/.config/opencode/plugins/tmux-agent-status.js"
+  if [ "$action" = uninstall ]; then
+    unlink "$v1"
+    unlink "$v2"
+    return 0
+  fi
+
+  if command -v opencode >/dev/null 2>&1; then
+    version=$(opencode --version 2>/dev/null || true)
+  else
+    echo "OpenCode not found; defaulting to the V1 plugin"
+    version=v1.0
+  fi
+
+  case "$version" in
+    *v2.*|*" 2."*|2.*)
+      unlink "$v1"
+      link "$ROOT/adapters/opencode/tmux-agent-status-v2.js" "$v2" ;;
+    *)
+      unlink "$v2"
+      link "$ROOT/adapters/opencode/tmux-agent-status.js" "$v1"
+      ;;
+  esac
+}
 do_pi()       { link "$ROOT/adapters/pi" "$HOME/.pi/agent/extensions/tmux-agent-status"; }
 
 link "$ROOT/bin/agent-status" "$BINDIR/agent-status"
