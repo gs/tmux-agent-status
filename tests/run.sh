@@ -84,7 +84,16 @@ eq "shell-pane record dropped" "$(as "$P1" list | cut -f1 | grep -c "^$PSH\$")" 
 
 echo "wrapper shells (sh -c 'agent; ...') do not look dead"
 tm respawn-pane -k -t "$P1" "sh -c 'sleep 300; true'"; sleep 0.4
-eq "foreground command is a shell (the trap)" "$(tm display-message -p -t "$P1" '#{pane_current_command}')" "sh"
+# The trap: the pane's command is a shell, so "is the agent still alive?" cannot
+# be answered from pane_current_command alone. Which name tmux reports is
+# host-dependent -- macOS /bin/sh is bash underneath and is reported as "bash",
+# not "sh" -- so accept any shell this plugin treats as one (see is_shell).
+cmd=$(tm display-message -p -t "$P1" '#{pane_current_command}')
+case " $cmd " in
+  " bash "|" zsh "|" fish "|" sh "|" dash "|" ksh "|" tcsh "|" nu "|" login ")
+    ok "foreground command is a shell (the trap)" ;;
+  *) bad "foreground command is a shell (the trap)" "expected a shell, got [$cmd]" ;;
+esac
 as "$P1" set working --agent claude
 eq "record survives: agent runs under the wrapper" "$(as "$P1" list | grep -c claude)" "1"
 tm respawn-pane -k -t "$P1" "exec -a claude sleep 600"; sleep 0.3; as "$P1" clear
@@ -131,13 +140,17 @@ eq "empty client falls back too" "$(tm display-message -p -c "$CLIENT" '#{pane_i
 
 echo "fzf-less menu + key entry point"
 as "$P1" clear; as "$P1" set working --agent claude; as "$P1" set waiting --agent claude --msg 'ok #(x)'
-# display-menu blocks until dismissed, so a *valid* menu means "still running at the timeout" (124);
-# a bad command line would fail at once with a message.
+# A valid menu blocks until dismissed, so "still running at the timeout" (124)
+# with no output means valid; a bad command line fails at once with a message.
+# A control-mode client -- which is what this harness attaches -- returns 0
+# immediately instead of blocking on some platforms, which is equally valid, so
+# accept a clean 0 too and reject only output or an unexpected status.
+menu_valid() { case "$1:$2" in 124:*|0:) return 0 ;; *) return 1 ;; esac; }
 out=$(timeout 2 "$BIN" menu "$CLIENT" 2>&1); rc=$?
-eq "menu is valid and shown (no fzf needed)" "$rc:$out" "124:"
+menu_valid "$rc" "$out" && ok "menu is valid and shown (no fzf needed)" || bad "menu is valid and shown (no fzf needed)" "rc=$rc out=$out"
 tm send-keys -K -c "$CLIENT" Escape; sleep 0.3
 out=$(AGENT_STATUS_NO_FZF=1 AGENT_STATUS_PANE=$P1 timeout 2 "$BIN" open "$CLIENT" 2>&1); rc=$?
-eq "open falls back to the menu when fzf is missing" "$rc:$out" "124:"
+menu_valid "$rc" "$out" && ok "open falls back to the menu when fzf is missing" || bad "open falls back to the menu when fzf is missing" "rc=$rc out=$out"
 tm send-keys -K -c "$CLIENT" Escape; sleep 0.3
 tm bind-key -T prefix z run-shell "true"; TMUX_PANE="" "$ROOT/agent-status.tmux"
 case "$(tm list-keys -T prefix | grep ' a ')" in *"agent-status' open"*) ok "key a is bound to 'open'";; *) bad "key a is bound to open" "$(tm list-keys -T prefix | grep ' a ')";; esac
@@ -174,8 +187,9 @@ echo "plugin entry is idempotent"
 tm set -g status-right "RIGHT"; tm set -gw window-status-format " #I:#W "
 tm set -g @agent-status-key-pick "" ; tm set -g @agent-status-key-next ""
 for _ in 1 2; do TMUX_PANE="" "$ROOT/agent-status.tmux"; done
-eq "status-right prefixed once" "$(tm show-option -gv status-right | grep -o '@agent_summary' | wc -l)" "1"
-eq "window format marked once" "$(tm show-option -gwv window-status-format | grep -o '?@agent_mark' | wc -l)" "1"
+# BSD wc pads its count to a fixed width, GNU does not: strip it.
+eq "status-right prefixed once" "$(tm show-option -gv status-right | grep -o '@agent_summary' | wc -l | tr -d ' ')" "1"
+eq "window format marked once" "$(tm show-option -gwv window-status-format | grep -o '?@agent_mark' | wc -l | tr -d ' ')" "1"
 eq "hook installed once" "$(tm show-hooks -gw | grep -c '^pane-focus-in\[91\]')" "1"
 
 echo; echo "passed $pass, failed $fail"
