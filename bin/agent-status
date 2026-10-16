@@ -190,7 +190,11 @@ refresh() {
       *) args+=(set-option -wu -t "$win" @agent_mark ';') ;;
     esac
   done
-  tmux "${args[@]}" set-option -g @agent_summary "$sum" ';' refresh-client -S 2>/dev/null
+  # refresh-client -S needs a client context, but hooks (pane-exited,
+  # session-closed, ...) and detached servers can run refresh with no client
+  # attached. There is nothing to redraw then, so do not let the non-zero exit
+  # turn into a "'...' refresh' returned 1" tmux job error over a pane.
+  tmux "${args[@]}" set-option -g @agent_summary "$sum" ';' refresh-client -S 2>/dev/null || :
 }
 
 # ------------------------------------------------------------------ banner --
