@@ -143,6 +143,19 @@ tm bind-key -T prefix z run-shell "true"; TMUX_PANE="" "$ROOT/agent-status.tmux"
 case "$(tm list-keys -T prefix | grep ' a ')" in *"agent-status' open"*) ok "key a is bound to 'open'";; *) bad "key a is bound to open" "$(tm list-keys -T prefix | grep ' a ')";; esac
 as "$P1" clear
 
+echo "exec-wrapped agents and no client"
+tm respawn-pane -k -t "$PSH" "exec -a 'bun /opt/x/node_modules/.bin/pi' sleep 600"; sleep 0.3
+eq "exec-wrapped agent found by script basename" "$(as "$P1" list | grep "^$PSH" | grep -c pi)" "1"
+tm respawn-pane -k -t "$PSH" "exec -a 'vim notes/pi' sleep 600"; sleep 0.3
+eq "any runtime + path operand with agent basename is found" "$(as "$P1" list | grep -c "^$PSH")" "1"
+tm respawn-pane -k -t "$PSH" "exec -a 'grep pi' sleep 600"; sleep 0.3
+eq "bare argv word is not matched" "$(as "$P1" list | grep -c "^$PSH")" "0"
+tm respawn-pane -k -t "$PSH" "bash --norc -i"; sleep 0.3
+tm -L "$SOCKNAME-nc" -f /dev/null new-session -d "sleep 60"
+NCT=$(tm -L "$SOCKNAME-nc" display-message -p '#{socket_path},#{pid},0')
+TMUX=$NCT AGENT_STATUS_PANE=%0 "$BIN" set working; eq "set exits 0 with no attached client" "$?" "0"
+tmux -L "$SOCKNAME-nc" kill-server; rm -f "$AGENT_STATUS_DIR"/*_0
+
 echo "degrades without ps / jq"
 tm respawn-pane -k -t "$PSH" "bash --norc -i"; sleep 0.3
 as "$PSH" set waiting --agent claude; AGENT_STATUS_NO_PS=1 as "$PSH" refresh

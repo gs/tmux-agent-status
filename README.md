@@ -132,6 +132,9 @@ report what you see.
 
 Agents that were already running when you installed keep running without reporting: restart them
 (in pi, `/reload`). They still appear in the list as `○` because they are found by process name.
+Detection looks at each process's name, and also at the basename of a path passed as the
+first argument, so launchers that `exec` a runtime (`bun /…/.bin/pi`, `node …/codex`) are
+found too. A bare word in the arguments (`grep pi`) is not matched.
 
 ## Keys
 
