@@ -122,7 +122,7 @@ step is optional, idempotent and reversible with `--uninstall`):
 |---|---|---|
 | Claude Code | hooks in `~/.claude/settings.json` (existing hooks are kept) | working / waiting / done |
 | Codex | hooks in `~/.codex/hooks.json` | approve the new hooks once with `/hooks` |
-| opencode | plugin symlinked into `~/.config/opencode/plugin/` | sub-agent sessions are ignored |
+| opencode | installer detects V1/V2 and links the matching plugin to its discovery directory | sub-agent sessions are ignored |
 | pi | extension symlinked into `~/.pi/agent/extensions/` | working / done only (pi has no permission prompts) |
 
 Verified so far: **pi** (live), **Claude Code** (live: a real `claude -p` run goes working → done → cleared;
