@@ -2,13 +2,32 @@ name: ci
 on: [push, pull_request]
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS is a supported host in practice (see README) but was untested here.
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - name: Install tmux, fzf, jq, shellcheck
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y tmux fzf jq shellcheck
+      - name: Install tmux, fzf, jq, shellcheck (macOS)
+        if: runner.os == 'macOS'
+        # coreutils for `timeout`, which the tests use and macOS does not ship.
+        # bash because the runner's /bin/bash is 3.2.
+        run: brew install tmux fzf jq shellcheck coreutils bash
       - name: Versions
         run: tmux -V && bash --version | head -1 && fzf --version
+      - name: Check tools the tests rely on
+        # bin/agent-status needs >= 4.2 and exits 0 silently on anything older,
+        # and the tests need `timeout` (coreutils on macOS): fail loudly here
+        # rather than with a confusing test failure.
+        run: |
+          bash -c '[ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 2 ]; }' \
+            || { echo "bash >= 4.2 required, found: $(bash --version | head -1)"; exit 1; }
+          command -v timeout >/dev/null || { echo "timeout not found (coreutils on macOS)"; exit 1; }
       - name: shellcheck
         run: shellcheck -x -S warning bin/agent-status adapters/hook.sh agent-status.tmux install.sh tests/run.sh
       - name: Tests

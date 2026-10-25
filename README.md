@@ -77,9 +77,10 @@ Answer it and the warning clears itself. The finished agent's `✓` waits for yo
 
 Debian/Ubuntu: `sudo apt install tmux git jq fzf` (the rest is normally preinstalled).
 Arch: `sudo pacman -S tmux git jq fzf`.
+macOS: `brew install tmux jq fzf bash coreutils` -- `bash` because the system one is 3.2, and
+`coreutils` only for `timeout`, which the test suite uses.
 
-Linux is what it's developed and tested on. Nothing here is desktop-specific, so macOS should work with a
-newer bash, but it is untested. The pi and opencode adapters run inside those agents' own
+Linux and macOS both run the test suite in CI. The pi and opencode adapters run inside those agents' own
 runtimes (Node), so they need nothing extra.
 
 ## Install
