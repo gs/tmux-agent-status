@@ -44,7 +44,7 @@ json_hooks() { # file agent events...
   mv "$tmp" "$file"; echo "$action: $file"
 }
 
-do_claude()   { json_hooks "$HOME/.claude/settings.json" claude UserPromptSubmit PostToolUse Notification Stop SessionEnd; }
+do_claude()   { json_hooks "$HOME/.claude/settings.json" claude UserPromptSubmit PostToolUse Notification Stop StopFailure SessionEnd; }
 do_codex()    { json_hooks "$HOME/.codex/hooks.json" codex UserPromptSubmit PostToolUse PermissionRequest Stop
                 if [ "$action" = install ]; then echo "codex: review the new hooks in codex (/hooks) so they are trusted"; fi; }
 do_opencode() { link "$ROOT/adapters/opencode/tmux-agent-status.js" "$HOME/.config/opencode/plugin/tmux-agent-status.js"; }

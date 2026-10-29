@@ -168,6 +168,12 @@ echo '{"notification_type":"idle_prompt","message":"m"}' | AGENT_STATUS_NO_JQ=1 
 eq "no jq: idle_prompt is not treated as waiting" "$(as "$P1" list | grep -v '○' | grep -c claude)" "0"
 echo '{"notification_type":"permission_prompt","message":"needs Bash"}' | AGENT_STATUS_NO_JQ=1 "$ROOT/adapters/hook.sh" claude Notification
 eq "no jq: permission prompt is waiting, message parsed" "$(as "$P1" list | grep -c 'needs Bash')" "1"
+as "$P1" clear; as "$P1" set working --agent claude
+echo '{"hook_event_name":"StopFailure","error_type":"cloud_credential_error"}' | AGENT_STATUS_NO_JQ=1 "$ROOT/adapters/hook.sh" claude StopFailure
+eq "no jq: StopFailure turns working into waiting, with the error type" "$(as "$P1" list | grep -c 'API error: cloud_credential_error')" "1"
+as "$P1" clear; as "$P1" set working --agent claude
+echo '{"hook_event_name":"StopFailure","error_type":"rate_limit"}' | "$ROOT/adapters/hook.sh" claude StopFailure
+eq "StopFailure turns working into waiting, with the error type" "$(as "$P1" list | grep -c 'API error: rate_limit')" "1"
 as "$P1" clear; unset AGENT_STATUS_PANE AGENT_STATUS_FOCUSED
 
 echo "hardening"

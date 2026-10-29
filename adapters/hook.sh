@@ -24,6 +24,10 @@ case $event in
     "$BIN" set waiting --agent "$agent" --msg "permission: $(field tool_name)" ;;
   Stop)
     "$BIN" set "done" --agent "$agent" ;;
+  StopFailure)
+    # The turn ended on an API error (credentials, rate limit, overload). Stop
+    # does not fire then, so without this the pane would read "working" forever.
+    "$BIN" set waiting --agent "$agent" --msg "API error: $(field error_type)" ;;
   SessionEnd)
     "$BIN" clear ;;
 esac >/dev/null 2>&1
